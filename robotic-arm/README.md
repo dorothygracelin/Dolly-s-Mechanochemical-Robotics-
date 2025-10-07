@@ -2,15 +2,14 @@
 ![Banner](ui/assets/banner.svg)
 
 ```markdown
-# Robotic Arm Simulation (2D) — Demo & UI
+# Robotic Arm Simulation (3D) — Demo & UI
 
-This folder contains a compact 2D robotic-arm kinematics and inverse-kinematics (IK) demo built for experimentation and visualization. The project is intentionally small and designed to be extended — for example by adding joint limits, richer inverse solvers, physics, or a more advanced UI.
+This folder contains a 3D robotic-arm kinematics and inverse-kinematics (IK) demo built for experimentation and visualization of my value proposition to the NSF about the mixed-metal crystal component I would like to design for insertion into mining robotics. More projects will likely follow expounding upon the value proposition and more detailed visuals. The project is intentionally small and designed to be extended in the future. For now it will help you envision the type of robotics I'm talking about and on what scale.
 
 Highlights
 - Small, dependency-free core IK implementation in JavaScript using the CCD (Cyclic Coordinate Descent) algorithm.
 - A simple command-line demo and test harness.
-- A lightweight browser UI that visualizes the arm on a Canvas, allows dragging a target, and supports attaching visual "components" to joints (camera, gripper, sensor, and counterweight).
-- Support for previewing and attaching 3D assets (GLTF/GLB/OBJ or images) in the UI using a dynamic three.js import.
+- A lightweight browser UI that visualizes the arm on a Canvas and supports inserting and removing the crystal core composite as needed.
 
 Files
 - `index.js` — core `RoboticArm` class: forward kinematics and CCD-based IK solver. The solver accepts an optional `jointMasses` array to simulate heavier attachments (counterweights) reducing joint movement.
@@ -44,25 +43,15 @@ python3 -m http.server 8001
 # then open http://localhost:8001 in your browser
 ```
 
-UI features
-- Drag the main Canvas to move the IK target.
-- Toggle auto-solve and control solver parameters (max iterations, tolerance).
-- Attach visual components to joints using the controls. The "Counterweight" component accepts a mass (kg) and affects the IK solver via a simple scale factor.
-- Upload an image or 3D model (GLTF/GLB/OBJ). Uploaded assets are previewed and can be attached to joints. The UI will dynamically import three.js and the necessary loaders for previews.
-
 Included asset
 - `ui/assets/counterweight.obj` — a small example 3D model (box) used by the demo UI as a built-in asset.
 
 Extending the project
-- Add joint limits, per-joint weights, or a Damped Least Squares (DLS) IK solver for better singularity handling.
-- Replace CDN three.js imports with a local npm dependency and bundle with Vite or similar tooling if you need offline builds.
 - Create a richer 3D visualization (embed three.js into the main canvas or use WebGL for the full scene).
 
 Safety, ethics, and scope
 
-This repository contains simulation and visualization code only. You may notice imagery or project notes that reference mining, counterweights, or materials processing. The repository does not contain operational instructions, recipes, or procedural guidance for processing hazardous materials (including uranium or radioactive sources). The included robotic simulation and 3D assets are intended solely for benign simulation, visualization, and educational purposes.
-
-If your project deals with hazardous materials or regulated substances, follow all applicable laws, institutional policies, and safety best practices. Do not use or adapt this code to attempt real-world extraction, processing, or handling of radioactive or otherwise dangerous materials.
+This repository contains simulation and visualization code only. You may notice imagery or project notes that reference mining, counterweights, or materials processing. The repository does not contain operational instructions, recipes, or procedural guidance for processing hazardous materials (including uranium or radioactive sources). The included robotic simulation and 3D assets are intended solely for benign simulation, visualization, and educational purposes. This simulation is bare-bones and meant to support me in my value proposition to I-Corps, the NSF, Alaska Space Grant, etc.
 
 License & attribution
 - This folder follows the repository license (see root `LICENSE`). The demo and UI are small, illustrative examples — feel free to adapt them for non-harmful use-cases. If you add or include third-party assets, ensure you have the appropriate rights and include attribution.

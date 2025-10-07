@@ -1,9 +1,77 @@
 /* global console */
-import { RoboticArm } from '../index.js';
+import { RoboticArm } from '@robotic-arm/index.js';
+import { Viewport3D } from './viewport3d.js';
 
-// safeDocument / safeWindow wrappers to avoid static-analysis errors in non-browser environments
-const safeDocument = (typeof globalThis !== 'undefined' && globalThis['document']) ? globalThis['document'] : { getElementById: ()=>null, createElement: ()=>({}), body: {} };
-const safeWindow = (typeof globalThis !== 'undefined' && globalThis['window']) ? globalThis['window'] : (typeof globalThis !== 'undefined' ? globalThis : { addEventListener: ()=>{}, innerWidth:1000, innerHeight:800, requestAnimationFrame: (fn)=> (globalThis && globalThis['setTimeout'] ? globalThis['setTimeout'](fn,16) : 0), cancelAnimationFrame: (id)=> (globalThis && globalThis['clearTimeout'] ? globalThis['clearTimeout'](id) : undefined), URL: { createObjectURL: ()=>'' }, webkitURL: { createObjectURL: ()=>'' } });
+// Initialize 3D viewport
+let viewport3d = null;
+
+// Initialize viewport and controls when DOM is ready
+async function initViewport() {
+    const canvas = document.getElementById('main3d');
+    if (!canvas) {
+        console.error('Could not find main3d canvas element');
+        return;
+    }
+
+    if (!viewport3d) {
+        try {
+            console.log('Initializing 3D viewport...');
+            
+            // Set initial canvas size
+            const container = canvas.parentElement;
+            if (container) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            } else {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            
+            // Force the canvas to be visible
+            canvas.style.display = 'block';
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            
+            viewport3d = new Viewport3D(canvas);
+            console.log('3D viewport initialized successfully');
+            
+            // Initialize position controls
+            initPositionControls();
+        } catch (error) {
+            console.error('Error initializing 3D viewport:', error);
+            console.error('Error details:', error.stack);
+        }
+    }
+}
+
+// Initialize position controls
+function initPositionControls() {
+    const axes = ['X', 'Y', 'Z'];
+    axes.forEach(axis => {
+        const slider = document.getElementById(`pos${axis}`);
+        const display = document.getElementById(`pos${axis}Value`);
+        
+        if (slider && display) {
+            slider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                display.textContent = value.toFixed(1);
+                if (viewport3d) {
+                    viewport3d.updateCounterweightPosition(axis.toLowerCase(), value);
+                }
+            });
+        }
+    });
+}
+
+// Wait for DOM and assets to load
+window.addEventListener('load', initViewport);
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    if (viewport3d) {
+        viewport3d.onResize();
+    }
+});
 
 const canvas = safeDocument.getElementById('canvas');
 const ctx = canvas ? canvas.getContext('2d') : null;
@@ -36,25 +104,49 @@ let previewState = null; // { scene, camera, modelGroup, renderer }
 
 async function initThreeIfNeeded(){
   if(threeRenderer) return threeRenderer.__THREE__;
-  if(!modelCanvas) return null;
-  const mod = await import('https://unpkg.com/three@0.154.0/build/three.module.js');
-  const THREE = mod.default;
-  // create renderer
-  threeRenderer = new THREE.WebGLRenderer({ canvas: modelCanvas, antialias: true, alpha: true });
-  threeRenderer.setSize(modelCanvas.width, modelCanvas.height);
+  
+  const main3dCanvas = safeDocument.getElementById('main3d');
+  if(!main3dCanvas) return null;
+  
+  const mod = await import('three');
+  const THREE = mod;
+  
+  // Create renderer with advanced features
+  threeRenderer = new THREE.WebGLRenderer({
+    canvas: main3dCanvas,
+    antialias: true,
+    alpha: false,
+    powerPreference: "high-performance",
+    stencil: false
+  });
+  
+  // Set up high-quality rendering
+  threeRenderer.setPixelRatio(window.devicePixelRatio);
+  threeRenderer.setSize(main3dCanvas.clientWidth, main3dCanvas.clientHeight);
   threeRenderer.outputEncoding = THREE.sRGBEncoding;
   threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-  threeRenderer.toneMappingExposure = 1.0;
-  // store ref to THREE for callers
+  threeRenderer.toneMappingExposure = 1.2;
+  threeRenderer.shadowMap.enabled = true;
+  threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  
+  // Store ref to THREE for callers
   threeRenderer.__THREE__ = THREE;
   return THREE;
 }
 
 function applyStandardMaterialTo(obj, THREE){
+  const materials = createCounterweightMaterials(THREE);
+  
   obj.traverse((node)=>{
     if(node.isMesh){
-      // give a metallic, slightly rough PBR material similar to a polished metal counterweight
-      node.material = new THREE.MeshStandardMaterial({ color: 0xb6c7d6, metalness: 0.96, roughness: 0.22, emissive: 0x001022, emissiveIntensity: 0.02 });
+      // Check mesh name to apply appropriate material
+      if(node.name.includes('window') || node.name.includes('display')) {
+        node.material = materials.window;
+      } else if(node.name.includes('sensor') || node.name.includes('port')) {
+        node.material = materials.sensor;
+      } else {
+        node.material = materials.body;
+      }
       node.castShadow = true;
       node.receiveShadow = true;
     }
@@ -73,18 +165,54 @@ function fitObjectToView(obj, camera, THREE){
   camera.lookAt(center.x, center.y, center.z);
 }
 
+import { createCounterweightMaterials, createLabEnvironmentMaterials, createLabLighting } from './materials.js';
+import { createMiningRobotMaterials, createMiningRobotGeometry } from './mining-components.js';
+
 function createPreviewScene(THREE){
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b1220);
-  // HDR-like lighting using hemisphere + directional + point
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x222244, 0.6);
-  scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-  dir.position.set(5, 10, 7);
-  scene.add(dir);
-  const rim = new THREE.PointLight(0xaaf0ff, 0.6);
-  rim.position.set(-3, -2, 3);
-  scene.add(rim);
+  scene.background = new THREE.Color(0x1a1a1a); // Industrial environment
+  
+  // Create enhanced lighting for industrial setting
+  const lights = createLabLighting(THREE, scene);
+  
+  // Add mining environment
+  const miningEnv = new THREE.Group();
+  
+  // Create industrial floor
+  const floorGeometry = new THREE.PlaneGeometry(200, 200);
+  const floorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    metalness: 0.7,
+    roughness: 0.4,
+    envMapIntensity: 0.8
+  });
+  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -10;
+  floor.receiveShadow = true;
+  miningEnv.add(floor);
+
+  // Create mining robot components
+  const materials = createMiningRobotMaterials(THREE);
+  const geometry = createMiningRobotGeometry(THREE);
+  
+  const base = geometry.createBase(materials);
+  const arm = geometry.createArm(materials);
+  const sensors = geometry.createSensorSystem(materials);
+  
+  // Position components
+  base.position.y = -8; // Just above floor
+  arm.position.set(0, -8, 0); // Attached to base
+  sensors.position.set(0, 2, 0); // At end of arm
+  
+  // Add to environment
+  miningEnv.add(base);
+  miningEnv.add(arm);
+  miningEnv.add(sensors);
+  
+  // Add environment to scene
+  scene.add(miningEnv);
+  
   return scene;
 }
 
@@ -95,12 +223,46 @@ function startPreviewAnimation(THREE){
     const camera = previewState.camera;
     const group = previewState.modelGroup;
     function animate(){
-      // if there is no interactive controls, gently auto-rotate the model
-      if(group && !previewState.controls) group.rotation.y += 0.008;
-      // update orbit controls if present
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - lastUpdateTime) / 1000; // Convert to seconds
+      lastUpdateTime = currentTime;
+
+      if(group && !previewState.controls) {
+        // Update motion with industrial constraints
+        const currentRotation = group.rotation.y;
+        const targetRotation = currentRotation + 0.008;
+        
+        const motion = motionSystem.updateMotion(
+          'preview',
+          currentRotation,
+          targetRotation,
+          deltaTime
+        );
+
+        // Apply motion with load-aware movement
+        group.rotation.y = motion.position;
+        
+        // Visual feedback for stress
+        if(motion.stress > 0.5) {
+          // Could add visual stress indicators here
+          group.material = materials.hazardStripes;
+        }
+      }
+
+      // Update industrial motion controls
       if(previewState.controls && typeof previewState.controls.update === 'function'){
+        const controlMotion = motionSystem.updateMotion(
+          'controls',
+          0,
+          1,
+          deltaTime
+        );
+        
+        // Apply industrial motion constraints to controls
+        previewState.controls.dampingFactor = 0.05 + (controlMotion.stress * 0.1);
         previewState.controls.update();
       }
+
       renderer.render(scene, camera);
       previewState.raf = safeWindow.requestAnimationFrame(animate);
     }
@@ -109,12 +271,26 @@ function startPreviewAnimation(THREE){
   }
 }
 
+import { IndustrialMotionSystem } from './motion-system.js';
+
 const arm = new RoboticArm([140, 100, 70]);
 arm.setAngles([0, 0, 0]);
 let target = arm.getEndEffector().slice();
 let dragging = false;
 let lastMouse = null;
 let components = []; // { jointIndex, type }
+
+// Initialize industrial motion system
+const motionSystem = new IndustrialMotionSystem({
+    maxSpeed: 0.8,        // Conservative max speed for mining operations
+    acceleration: 0.15,   // Gentle acceleration for heavy loads
+    deceleration: 0.25,   // Stronger deceleration for safety
+    loadFactor: 1.2,      // Account for mining equipment weight
+    safetyMargin: 0.15    // Wider safety margin for industrial setting
+});
+
+// Track last update time for motion calculations
+let lastUpdateTime = performance.now();
 
 // populate joint selector
 function refreshJointSelect(){
@@ -304,7 +480,7 @@ if(assetInput) assetInput.addEventListener('change', async (ev)=>{
       // lazy import GLTFLoader and init three
       const THREE = await initThreeIfNeeded();
       if(!THREE) throw new Error('Three initialization failed');
-      const { GLTFLoader } = await import('https://unpkg.com/three@0.154.0/examples/jsm/loaders/GLTFLoader.js');
+        const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
       const scene = createPreviewScene(THREE);
       const camera = new THREE.PerspectiveCamera(45, modelCanvas.width / modelCanvas.height, 0.1, 1000);
       const loader = new GLTFLoader();
@@ -321,7 +497,7 @@ if(assetInput) assetInput.addEventListener('change', async (ev)=>{
         // create orbit controls
         (async ()=>{
           try{
-            const { OrbitControls } = await import('https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js');
+              const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
             const controls = new OrbitControls(camera, threeRenderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.06;
@@ -354,7 +530,7 @@ if(previewName) previewName.addEventListener('dblclick', async ()=>{
   try{
     const THREE = await initThreeIfNeeded();
     if(!THREE) throw new Error('Three initialization failed');
-    const { OBJLoader } = await import('https://unpkg.com/three@0.154.0/examples/jsm/loaders/OBJLoader.js');
+      const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js');
     const scene = createPreviewScene(THREE);
     const camera = new THREE.PerspectiveCamera(45, modelCanvas.width / modelCanvas.height, 0.1, 1000);
     const loader = new OBJLoader();
@@ -369,7 +545,7 @@ if(previewName) previewName.addEventListener('dblclick', async ()=>{
       scene.add(obj);
       (async ()=>{
         try{
-          const { OrbitControls } = await import('https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js');
+            const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
           const controls = new OrbitControls(camera, threeRenderer.domElement);
           controls.enableDamping = true;
           controls.dampingFactor = 0.06;

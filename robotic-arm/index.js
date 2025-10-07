@@ -60,7 +60,6 @@ class RoboticArm {
     // Support optional per-joint masses which reduce how much a joint moves when a heavy component
     // is attached. To preserve backward compatibility, read jointMasses and massFactor from options
     // if provided.
-    const jointMasses = arguments[1] && arguments[1].jointMasses ? arguments[1].jointMasses : (arguments[1] && arguments[1].jointMasses === 0 ? [] : (arguments[1] && arguments[1].jointMasses) );
     // but to be robust, accept jointMasses from the passed-in options object directly
     let jointMassesArr = [];
     if(arguments[1] && Array.isArray(arguments[1].jointMasses)) jointMassesArr = arguments[1].jointMasses;
