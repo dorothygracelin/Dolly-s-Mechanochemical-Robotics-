@@ -17,7 +17,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id) return null;
-          // Put the main three package in its own chunk
+          // Put the main Three.js package in its own chunk
           if (id.includes('node_modules/three') && !id.includes('node_modules/three/examples')) {
             return 'three-vendor';
           }
