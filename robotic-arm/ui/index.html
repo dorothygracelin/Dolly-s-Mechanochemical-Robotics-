@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Robotic Arm UI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Robotic Arm — UI Demo</h1>
+  <div class="container">
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div class="controls">
+      <div>
+        <label>Auto-solve: <input type="checkbox" id="autoSolve" checked></label>
+      </div>
+      <div>
+        <label>Max Iterations: <input type="number" id="maxIter" value="200" min="1"></label>
+      </div>
+      <div>
+        <label>Tolerance: <input type="number" step="0.1" id="tol" value="0.5"></label>
+      </div>
+      <hr />
+      <div>
+        <label>Attach component to joint:
+          <select id="jointSelect"></select>
+        </label>
+      </div>
+      <div>
+        <label>Component:
+          <select id="componentSelect">
+            <option value="camera">Camera</option>
+            <option value="gripper">Gripper</option>
+            <option value="sensor">Sensor</option>
+            <option value="counterweight">Counterweight</option>
+          </select>
+        </label>
+      </div>
+      <div id="massRow" style="display:none;">
+        <label>Mass (kg): <input type="number" id="massInput" value="1" step="0.1" min="0"></label>
+      </div>
+      <div class="btn-row">
+        <button id="attachBtn">Attach</button>
+        <button id="detachBtn">Detach</button>
+      </div>
+      <hr />
+      <div>
+        <label>Upload asset (image or .glb/.gltf): <input type="file" id="assetInput" accept="image/*,.glb,.gltf"></label>
+      </div>
+      <div id="previewContainer">
+        <div id="previewName"></div>
+        <img id="previewImage" style="max-width:100%;display:none" />
+        <canvas id="modelCanvas" width="320" height="240" style="display:none;border:1px solid #ddd;background:#fff"></canvas>
+      </div>
+      <hr />
+      <div id="info"></div>
+      <p class="hint">Drag the canvas to move the target. Click a joint in the dropdown and attach a component to visualize it.</p>
+    </div>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
